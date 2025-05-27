@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No image provided" }, { status: 400 })
     }
 
-    const apiKey = process.env.GEMINI_API
+    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API
     if (!apiKey) {
       return NextResponse.json({ error: "Gemini API key not configured" }, { status: 500 })
     }
