@@ -27,6 +27,45 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Textarea } from "@/components/ui/textarea"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
+// Image compression utility
+const compressImage = (file: File, maxWidth = 1024, quality = 0.8): Promise<string> => {
+  return new Promise((resolve) => {
+    const canvas = document.createElement("canvas")
+    const ctx = canvas.getContext("2d")!
+    const img = new Image()
+
+    img.onload = () => {
+      // Calculate new dimensions while maintaining aspect ratio
+      let { width, height } = img
+
+      if (width > height) {
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width
+          width = maxWidth
+        }
+      } else {
+        if (height > maxWidth) {
+          width = (width * maxWidth) / height
+          height = maxWidth
+        }
+      }
+
+      // Set canvas dimensions
+      canvas.width = width
+      canvas.height = height
+
+      // Draw and compress
+      ctx.drawImage(img, 0, 0, width, height)
+
+      // Convert to base64 with compression
+      const compressedDataUrl = canvas.toDataURL("image/jpeg", quality)
+      resolve(compressedDataUrl)
+    }
+
+    img.src = URL.createObjectURL(file)
+  })
+}
+
 const CelebrationAnimation = ({ onComplete }: { onComplete: () => void }) => {
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -106,19 +145,38 @@ export default function HRMSTimeCalculator() {
     return () => clearInterval(interval)
   }, [])
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        setUploadedImage(e.target?.result as string)
+      try {
+        // Show loading state
+        setAiProgress("Compressing image...")
+
+        // Compress the image
+        const compressedImage = await compressImage(file, 1024, 0.8)
+
+        // Calculate file size reduction
+        const originalSize = file.size
+        const compressedSize = Math.round((compressedImage.length * 3) / 4) // Approximate base64 size
+        const reduction = Math.round(((originalSize - compressedSize) / originalSize) * 100)
+
+        setUploadedImage(compressedImage)
         setExtractedEntries([])
         setExtractedText("")
         setAiError(null)
-        setAiProgress("")
-        setShowImagePreview(false) // Hide preview when new image is uploaded
+        setShowImagePreview(false)
+
+        // Show compression info
+        setAiProgress(
+          `✅ Image compressed by ${reduction}% (${(originalSize / 1024 / 1024).toFixed(1)}MB → ${(compressedSize / 1024 / 1024).toFixed(1)}MB)`,
+        )
+
+        // Clear progress after 3 seconds
+        setTimeout(() => setAiProgress(""), 3000)
+      } catch (error) {
+        console.error("Image compression failed:", error)
+        setAiError("Failed to compress image. Please try a different image.")
       }
-      reader.readAsDataURL(file)
     }
   }
 
